@@ -1,0 +1,46 @@
+# SpreadsheetBench v1 rollout-hook settings, injected onto slime args via
+# --custom-config-path (read by officeqa_rl.training.ssb1_rollout).
+#
+# DooD invariant: officeqa_workspace_root AND every JSONL row's
+# metadata.data_root must exist at the SAME absolute path on the Docker host
+# and inside the training container — the episode sandbox mounts the
+# workspace, and the replay/recalc containers mount score directories created
+# under it (see README).
+officeqa_workspace_root: /mnt/officeqa-rl/results/rollout_workspaces
+officeqa_max_observation_chars: 12000
+# Concurrency caps are cluster-wide (one rollout-manager process boots every
+# container). Sized for 256-episode rollouts (4-node rbs32): ~760 replay+
+# recalc runs per rollout through these slots, LibreOffice recalc ~1 core
+# each, against 208 host vCPUs that sat ~85% idle at cap 8 with 128 episodes.
+officeqa_max_concurrent_sandbox_boots: 48
+
+# Built from docker/spreadsheetbench/Dockerfile (openpyxl + LibreOffice +
+# view_xlsx); must exist on every node's HOST Docker daemon:
+#   docker build -t spreadsheetbench-v1-sandbox docker/spreadsheetbench
+officeqa_ssb1_sandbox_image: spreadsheetbench-v1-sandbox
+# Same episode budget as the offline eval (scripts/run_spreadsheetbench_v1_eval.py).
+officeqa_ssb1_step_limit: 50
+officeqa_ssb1_command_timeout_sec: 120
+officeqa_ssb1_action_block_language: bash
+
+# Grading: replay solution.py on every workbook case (fresh network-less
+# container each), recalculate formulas with LibreOffice, compare designated
+# cells. Replay+recalc pairs are capped separately from sandbox boots.
+officeqa_ssb1_replay_timeout_sec: 600
+officeqa_ssb1_recalc_timeout_sec: 600
+officeqa_ssb1_skip_recalc: false
+officeqa_ssb1_max_concurrent_replays: 48
+# Hard cap for every container running agent-written code (episode sandboxes
+# and replays). One runaway solution.py without a cap can OOM the host and
+# take the training job down (2026-08-06 incident); a capped kill just grades
+# that case as failed.
+officeqa_ssb1_container_memory_limit: 8g
+# Score directories (<workspace>-score) are deleted after grading; true keeps
+# them for debugging (they grow by ~3 workbooks per submitted episode).
+officeqa_ssb1_keep_replay_dirs: false
+
+# Rows whose metadata.benchmark is not "ssb1" are forwarded here unchanged.
+# The OfficeQA fallback additionally needs the officeqa_corpus_dir /
+# officeqa_sandbox_image / officeqa_step_limit keys from
+# configs/training/officeqa_rollout.yaml if such rows can actually occur.
+officeqa_ssb1_fallback_generate_path: officeqa_rl.training.rollout.generate

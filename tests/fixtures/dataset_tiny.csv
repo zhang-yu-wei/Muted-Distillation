@@ -1,0 +1,6 @@
+uid,question,answer,source_docs,source_files,difficulty
+synthetic-001,What revenue was reported in the synthetic bulletin?,123.45 million,https://example.invalid/doc1,example_a.txt,easy
+synthetic-002,How many synthetic widgets were produced in 1950?,"7,500",https://example.invalid/doc2,example_b.txt,hard
+synthetic-003,What was the synthetic surplus for fiscal year 1953?,42,https://example.invalid/doc3,example_a.txt example_c.txt,hard
+synthetic-004,Which synthetic office reported the largest expenditure?,Office of Examples,https://example.invalid/doc4,example_d.txt,easy
+synthetic-005,What is the sum of synthetic receipts for 1960 and 1961?,"1,001",https://example.invalid/doc5,example_e.txt,hard

@@ -1,0 +1,5 @@
+# Refresh only repository-owned helpers in an already installed SSB sandbox.
+FROM spreadsheetbench-v1-sandbox:latest
+COPY view_xlsx /usr/local/bin/view_xlsx
+RUN chmod +x /usr/local/bin/view_xlsx
+COPY recalc_xlsx.py /opt/recalc_xlsx.py

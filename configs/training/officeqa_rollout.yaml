@@ -1,0 +1,13 @@
+# OfficeQA rollout-hook settings, injected onto slime args via
+# --custom-config-path (read by officeqa_rl.training.rollout).
+#
+# DooD invariant: corpus_dir and workspace_root must exist at the SAME absolute
+# path on the Docker host and inside the training container (see README).
+officeqa_corpus_dir: /mnt/officeqa-rl/data/treasury_bulletins_parsed/transformed
+officeqa_workspace_root: /mnt/officeqa-rl/results/rollout_workspaces
+officeqa_sandbox_image: python:3.11-slim
+officeqa_sandbox_runtime: docker
+officeqa_step_limit: 120
+officeqa_command_timeout_sec: 30
+officeqa_max_observation_chars: 12000
+officeqa_max_concurrent_sandbox_boots: 8

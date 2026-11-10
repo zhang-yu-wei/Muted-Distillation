@@ -1,0 +1,79 @@
+# JobBench rollout-hook settings, injected onto slime args via
+# --custom-config-path (read by officeqa_rl.training.jobbench_rollout).
+#
+# DooD invariant: officeqa_workspace_root AND every JSONL row's
+# metadata.data_root must exist at the SAME absolute path on the Docker host
+# and inside the training container — the episode sandbox bind-mounts the
+# workspace, and the task folder is copied from the data root (see README).
+officeqa_workspace_root: /mnt/officeqa-rl/results/rollout_workspaces
+officeqa_max_observation_chars: 12000
+# One container boot per episode. JobBench boots are cheap (no LibreOffice in
+# the image), so this can sit higher than the SpreadsheetBench setting.
+officeqa_max_concurrent_sandbox_boots: 48
+
+# Built from docker/jobbench/Dockerfile; must exist on every node's HOST
+# Docker daemon:
+#   docker build -t jobbench-sandbox docker/jobbench
+officeqa_jobbench_sandbox_image: jobbench-sandbox
+# Same episode budget as the offline eval (scripts/run_jobbench_eval.py).
+# JobBench tasks read ~10 reference files and write several deliverables, so
+# they need a longer horizon than SpreadsheetBench's single-workbook edit.
+officeqa_jobbench_step_limit: 60
+officeqa_jobbench_command_timeout_sec: 180
+officeqa_jobbench_wall_time_limit_sec: 0
+# mini-swe-agent exits after this many malformed responses in a row. Keep it
+# small: a 4B policy that cannot produce the action format burns the whole step
+# budget otherwise, and the episode is unrecoverable anyway.
+officeqa_jobbench_max_consecutive_format_errors: 3
+# Hard cap for the container running policy-written code. One runaway program
+# without a cap can OOM the host and take the training job down
+# (2026-08-06 incident on the SpreadsheetBench path).
+officeqa_jobbench_container_memory_limit: 8g
+# omit  : stage only task_folder/, as the official runner does. Main-split
+#         rubric items about externally-sourced documents are then unreachable.
+# stage : also copy files_required_to_search/ into the workspace. Needed for a
+#         network-less sandbox to reach full score, and not comparable with
+#         published JobBench numbers. The easy training split has no such
+#         files, so this knob only affects main-split eval rollouts.
+officeqa_jobbench_search_file_policy: omit
+# Workspaces are deleted after grading; true keeps them for debugging (they
+# grow by the task folder plus deliverables per episode).
+officeqa_jobbench_keep_workspaces: false
+
+# Grading. The reward is an LLM judge over the task's weighted rubric: one call
+# per rubric item (~9 per episode), every rollout sample. The key is read from
+# the environment on the rollout worker, never from this file — export it on
+# every node before launching.
+# grok-4.3 is the published leaderboard's judge, but xAI models are not
+# enabled on this project, so grading runs on Gemini through Vertex AI's
+# OpenAI-compatible endpoint. That endpoint authenticates with ADC, so no
+# JUDGE_API_KEY is needed (set one only to override with a keyed endpoint).
+# A different judge is a different measuring stick -- keep it fixed across a
+# campaign so runs stay comparable with offline JobBench numbers.
+officeqa_jobbench_judge_api_key_env: JUDGE_API_KEY
+officeqa_jobbench_judge_model: google/gemini-3.5-flash
+officeqa_jobbench_judge_api_base: https://aiplatform.googleapis.com/v1/projects/YOUR_GCP_PROJECT/locations/global/endpoints/openapi
+officeqa_jobbench_judge_timeout_sec: 300
+# The judge shares Vertex with the OPD teacher and sees the same 503s. A
+# rubric that never grades still counts its weight in the denominator, so a
+# judge failure biases the attempt's score DOWN -- worth retrying hard.
+# Backoff is exponential from retry_delay_sec, capped at retry_max_delay_sec,
+# with jitter so concurrent rubrics do not retry in lockstep. Permanent
+# rejections (400/401/403/404) break out instead of burning the budget.
+officeqa_jobbench_judge_max_retries: 8
+officeqa_jobbench_judge_retry_delay_sec: 4.0
+officeqa_jobbench_judge_retry_max_delay_sec: 60.0
+# Concurrent judge calls within ONE episode. Total in-flight calls are this
+# times the number of concurrent episodes, so raise it only after checking the
+# judge endpoint's rate limit.
+officeqa_jobbench_judge_concurrency: 4
+officeqa_jobbench_judge_max_completion_tokens: 16384
+# Attach deliverable images to rubric items that ask about a plot or figure.
+# Turn off for a text-only judge endpoint.
+officeqa_jobbench_judge_images: true
+
+# Rows whose metadata.benchmark is not "jobbench" are forwarded here unchanged.
+# The OfficeQA fallback additionally needs the officeqa_corpus_dir /
+# officeqa_sandbox_image / officeqa_step_limit keys from
+# configs/training/officeqa_rollout.yaml if such rows can actually occur.
+officeqa_jobbench_fallback_generate_path: officeqa_rl.training.rollout.generate
